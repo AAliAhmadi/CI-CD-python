@@ -1,7 +1,7 @@
-# This workflow will install Python dependencies, run tests and lint, then build and push a Docker image
+# This workflow will install Python dependencies, run tests and lint with a single version of Python
 # For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
 
-name: Python CI/CD (Two-Stage)
+name: Python CI
 
 on:
   push:
@@ -11,19 +11,15 @@ on:
 
 permissions:
   contents: read
-  packages: write  # Needed to push the Docker image
 
 jobs:
-  ci:  # First stage: Continuous Integration
-    name: Continuous Integration (Test & Lint)
+  build:
     runs-on: ubuntu-latest
-    permissions:
-      checks: write  # Needed for the test report
     steps:
     - uses: actions/checkout@v4
     
     - name: Set up Python 3.10
-      uses: actions/setup-python@v5  # Updated to v5 for latest features
+      uses: actions/setup-python@v5
       with:
         python-version: "3.10"
     
@@ -42,41 +38,12 @@ jobs:
     
     - name: Test with pytest
       run: |
-        python -m pytest --verbose --junit-xml=junit.xml  # Generates a test report
+        python -m pytest --verbose --junit-xml=junit.xml
     
     - name: Publish Test Report
-      uses: mikepenz/action-junit-report@v4  # Publishes the test report
-      if: success() || failure()  # Always runs, even if tests fail
+      uses: mikepenz/action-junit-report@v4
+      if: success() || failure()
       with:
         report_paths: '**/junit.xml'
         detailed_summary: true
         include_passed: true
-
-  cd:  # Second stage: Continuous Deployment
-    name: Continuous Deployment (Build & Push Docker Image)
-    needs: ci  # This job waits for the 'ci' job to complete
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-      
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: true
-          tags: ghcr.io/${{ github.repository }}:latest
-          cache-from: type=registry,ref=ghcr.io/${{ github.repository }}:buildcache
-          cache-to: type=registry,ref=ghcr.io/${{ github.repository }}:buildcache,mode=max
